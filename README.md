@@ -1,4 +1,5 @@
 Description:
+
 This project contains a fully vertical scalable ETL (Extract, Transform, Load) pipeline to handle large volumes of transaction data for our client (T2 Cafe Franchise Manager). Unlike the individual mini-project, our serverless application allows our client to:
 
 Access real data from over 100 cafe locations;
