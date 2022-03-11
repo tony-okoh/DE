@@ -1,0 +1,218 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Template to deploy a lambda which is triggered by an S3 event.
+
+Parameters:
+  DeploymentBucket:
+    Type: String
+    Description: Enter the name of the S3 bucket where your deployment package is.
+ 
+  ETDeploymentPackageKey: 
+    Type: String 
+    Description: Enter the name of the S3 key of your extract and transform deployment package. #
+  LoadDeploymentPackageKey: 
+    Type: String
+    Description: Enter the name of the S3 key of your load deployment package. 
+  ETBucketName: #or DATABucketName
+    Type: String
+    Description: Enter the name of S3 bucket for receiving the csv file from Harry to trigger extract and transform lambda function. #
+  LoadBucketName: 
+    Type: String
+    Description: Enter the name of S3 bucket for storing the transformed csv.
+  StandardQueueName: 
+    Type: String 
+    Description: Team2 queue 
+  MyDeadLetterQueueName: #New add
+    Type: String
+    Description: dead letter dlq name
+    
+Resources:
+### NEW ADDED
+  MyQueue: 
+    Type: AWS::SQS::Queue 
+    Properties: 
+      QueueName: !Ref StandardQueueName 
+      VisibilityTimeout: 900
+      RedrivePolicy: #Set redrive policy of source queue to send failed message to dead letter queue.
+        deadLetterTargetArn: !GetAtt MyDeadLetterQueue.Arn #deadLetterTargetArn : Here you provide the actual ARN of queue you would like to use as dead letter queue.
+        maxReceiveCount: 5 # maxReceiveCount: The number of times a message is delivered to the source queue before being moved to the dead-letter queue    
+### 
+### NEW ADDED
+  MyQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref MyQueue
+      PolicyDocument: 
+        Id: SQSPolicy
+        Version: '2008-10-17' 
+        Statement:
+        - Sid: SQSEventPolicy
+          Effect: Allow
+          Principal: "*"
+          Action:
+            - SQS:SendMessage
+            - SQS:ReceiveMessage
+          Resource: !GetAtt MyQueue.Arn 
+          Condition:
+            ArnLike:
+              aws:SourceArn: arn:aws:s3:::*
+
+###########---BRAND NEW ADDED THE DEAD QUEUES LETTER sqs---################
+
+  MyDeadLetterQueue:  #to be reviewed
+    Type: AWS::SQS::Queue
+    Properties: 
+      QueueName: !Ref MyDeadLetterQueueName
+
+  
+
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - lambda.amazonaws.com
+          Action:
+            - sts:AssumeRole
+      Path: "/"
+      PermissionsBoundary: !Sub arn:aws:iam::${AWS::AccountId}:policy/ScopePermissions
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+      - PolicyName: LambdaLogsPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+
+      ### NEW SQS POLICY
+      - PolicyName: AllowSqs
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ChangeMessageVisibility
+            Resource: !GetAtt MyQueue.Arn 
+
+  ETLambdaFunction: #
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.8
+      Handler: et_pipeline/et_lambda_function.handler #
+      Timeout: 900
+      Role: !GetAtt LambdaFunctionRole.Arn # DOESN'T CHANGE BECAUSE BOTH FUNCTIONS WILL USE THE SAME ROLE
+      Code:
+        S3Bucket: !Ref DeploymentBucket # DOESN'T CHANGE BECAUSE BOTH FUNCTIONS WILL USE THE SAME DEPLOYMENT BUCKET
+        S3Key: !Ref ETDeploymentPackageKey #
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0ffebdada773368d5
+        SubnetIds:
+          - subnet-094bb267969b977e2
+      Layers:
+        - !Ref MyLayer
+      Environment:
+        Variables:
+          LOAD_BUCKET_NAME: !Ref LoadBucketName
+
+### NEW ADDED
+  LoadLambdaFunction: #
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.8
+      Handler: load_pipeline/load_lambda_function.handler #
+      Timeout: 900
+      Role: !GetAtt LambdaFunctionRole.Arn # DOESN'T CHANGE BECAUSE BOTH FUNCTIONS WILL USE THE SAME ROLE
+      Code:
+        S3Bucket: !Ref DeploymentBucket # DOESN'T CHANGE BECAUSE BOTH FUNCTIONS WILL USE THE SAME DEPLOYMENT BUCKET
+        S3Key: !Ref LoadDeploymentPackageKey #
+      VpcConfig:
+        SecurityGroupIds:
+          - sg-0ffebdada773368d5
+        SubnetIds:
+          - subnet-094bb267969b977e2
+      Layers:
+        - !Ref MyLayer
+
+
+### NEW ADDED
+  LoadLambdaFunctionEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 1
+      Enabled: true
+      EventSourceArn: !GetAtt MyQueue.Arn
+      FunctionName: !GetAtt LoadLambdaFunction.Arn
+
+
+  MyLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties: 
+      LayerName: team_2_main_layer 
+      Description: Team2's Layer 
+      Content:
+        S3Bucket: team-2-template-bucket 
+        S3Key: deployment_package_main_layer.zip
+      CompatibleArchitectures: 
+        - x86_64 
+      CompatibleRuntimes:
+        - python3.8 
+
+  ETS3Bucket: #
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref ETBucketName #
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt ETLambdaFunction.Arn #
+
+### NEW ADDED
+  LoadS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref LoadBucketName
+      NotificationConfiguration:
+        QueueConfigurations:
+          - Event: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: ".csv"
+            Queue: !GetAtt MyQueue.Arn
+
+
+  ETS3BucketPermission:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ETLambdaFunction #
+      Principal: s3.amazonaws.com
+      SourceArn: !GetAtt ETS3Bucket.Arn #
+
+### NEW ADDED
+  LoadS3BucketPermission:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LoadLambdaFunction #
+      Principal: s3.amazonaws.com
+      SourceArn: !GetAtt LoadS3Bucket.Arn   #
+
