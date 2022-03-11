@@ -1,22 +1,24 @@
 Description:
 
-This project contains a fully vertical scalable ETL (Extract, Transform, Load) pipeline to handle large volumes of transaction data for our client (T2 Cafe Franchise Manager). Unlike the individual mini-project, our serverless application allows our client to:
+This project contains an event-driven, scalable ETL (Extract, Transform, Load) pipeline to handle large volumes of transaction data for our client (T2 Cafe Franchise Manager). The serverless application allows our client to:
 
 Access real data from over 100 cafe locations;
 Identify local and regional customer trends;
 Use this information to make informed and impactful decisions.
+
+
 Technologies & Architectures:
 Languages: Python 3.8, Yaml, SQL
 Cloud Provider: AWS
 Storage: Amazon S3
 Compute: AWS Lambda
-Integration Amazon SQS
-Database Amazon Redshift
-Parameter/Password store - AWS SSM
-Access Control - AWS IAM
+Decoupling: Amazon SQS
+Database: Amazon Redshift
+Parameter/Password store: AWS SSM
+Access/Identity Control: AWS IAM
 Analytics & Monitoring: Grafana, AWS CloudWatch
-Source Control CI/CD Pipeline, Git
-Schema Design Draw.io Link to our Serverless Event Driven ETL Pipeline
+Source Control CI/CD Pipeline: Git
+Schema Design: Draw.io Link to our Serverless Event Driven ETL Pipeline - 
 Unit Testing:
 Unit tests are written with the use of the Pandas Libary pandas.test, and Python's built in libraries such as Pytest and Moto. The transformation for 3NF for each table is fully unit tested.
 
