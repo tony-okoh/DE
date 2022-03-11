@@ -1,0 +1,12 @@
+Order_id,Customer_name,Customer_address,Customer_phone,Courier,Statuss,Items
+1,Tim Kay,"24 Lee Lane, Wigan",793693547,7.0,PREPARING,24
+2,Lee Frank,"98, Lee Road, Lees",987456321,2.0,OUT FOR DELIVERY,"1,6"
+3,Jay Leop,"234, Rug Road, Mars",123654789,,DELIVERED,
+4,Ben Man,"8, West Street, East",145362789,2.0,CANCELLED,
+5,Lee James,32 East Weast Road,639856748,2.0,OUT FOR DELIVERY,"1,5,9"
+6,Jay Ben,"471, Jays Raod, Jays",369852147,3.0,PREPARING,"1,2"
+7,Joe Paul,"582, Paul Street, Leeds",654789,2.0,CANCELLED,"1,6"
+8,Jay Paul,"333, Leed Street, Leeds",258369147,5.0,OUT FOR DELIVERY,"1,5,4"
+9,Kim K,"564, Jim Road, Crewe",147852369,7.0,PREPARING,"1,5,3"
+10,Jay T,"234, Map Road, Wales",741963852,1.0,PREPARING,"1,2,3"
+11,Tony,"417, Tony Road",258963147,5.0,DELIVERED,"1,4,23"
